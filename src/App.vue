@@ -4,7 +4,6 @@ import Clouds from "./components/Clouds.vue";
 
 <template>
   <Clouds />
-  <img src="./assets/cloud.png" />
 </template>
 
 <style>
