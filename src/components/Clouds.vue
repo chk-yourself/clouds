@@ -3,7 +3,7 @@
 </template>
 
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
@@ -26,6 +26,12 @@ export default {
 
     const pageWidth = document.getElementById("app").clientWidth;
     const pageHeight = document.getElementById("app").clientHeight;
+    let scrollPosition = ref({
+      y: 0,
+      deltaY: 0,
+      position: 0,
+    });
+
     let camera, scene, renderer, mesh;
 
     function init() {
@@ -121,17 +127,44 @@ export default {
     }
 
     function animate() {
-      requestAnimationFrame(animate);
       // Start from the farthest z-axis and move forward little by little to achieve the purpose of crossing the clouds
-      camera.position.z =
+      let { position, deltaY } = scrollPosition.value;
+      position += deltaY;
+      camera.position.z = CAMERA_POSITION_Z - position;
+      /*camera.position.z =
         CAMERA_POSITION_Z -
-        (((Date.now() - START_TIME) * 0.03) % CAMERA_POSITION_Z);
+        (((Date.now() - START_TIME) * 0.03) % CAMERA_POSITION_Z);*/
       renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    function onWheel(e) {
+      scrollPosition.value.deltaY = e.wheelDeltaY || e.deltaY;
+      // reduce by half the delta amount otherwise it scroll too fast
+      scrollPosition.value.deltaY *= 0.5;
+
+      //scroll(e);
+    }
+
+    function scroll(e) {
+      let { position, deltaY } = scrollPosition.value;
+      if (position + deltaY > 0) {
+        position = 0;
+        // limit scroll bottom
+      } else if (-(position + deltaY) >= pageHeight) {
+        position = -pageHeight;
+      } else {
+        position += deltaY;
+      }
     }
 
     onMounted(() => {
       init();
       animate();
+      document.body.addEventListener("wheel", onWheel);
+    });
+    onUnmounted(() => {
+      document.body.removeEventListener("wheel", onWheel);
     });
     return { clouds };
   },
