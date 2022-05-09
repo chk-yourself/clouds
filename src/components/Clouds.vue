@@ -1,5 +1,10 @@
 <template>
-  <div class="clouds" ref="clouds"></div>
+  <div class="wrapper">
+    <div class="clouds" ref="clouds"></div>
+    <div class="sign" ref="sign">
+      <img class="sign__img" src="../assets/sign.jpg" alt="" />
+    </div>
+  </div>
 </template>
 
 <script>
@@ -7,7 +12,11 @@ import { ref, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
+
 // credit https://github.com/hezhongfeng/music163-demo
+
+// TODO: reveal sign when you reach the top of the page
+
 export default {
   setup() {
     const clouds = ref(null);
@@ -172,10 +181,51 @@ export default {
 </script>
 
 <style scoped>
+.wrapper {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  overflow-y: auto;
+  perspective: 2px;
+  position: relative;
+}
 .clouds {
   width: 100%;
   height: 100vh;
   flex-shrink: 0;
   background-image: linear-gradient(rgb(200, 240, 255), rgb(219, 255, 241));
+}
+
+.sign {
+  height: 100%;
+}
+
+.sign__img {
+  position: absolute;
+  max-width: 100%;
+  height: auto;
+  top: 50%;
+  right: 50%;
+  transform: translate(-50%, -50%) scale(1.3);
+  background-size: 100%;
+  z-index: -1;
+  animation: reveal 2s;
+  animation-fill-mode: forwards;
+}
+
+@keyframes reveal {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0;
+  }
+  51% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 </style>
