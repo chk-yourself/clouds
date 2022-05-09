@@ -2,7 +2,7 @@
   <div class="wrapper">
     <div class="clouds" ref="clouds"></div>
     <div class="sign" ref="sign">
-      <img class="sign__img" src="../assets/sign.jpg" alt="" />
+      <img class="sign__img" src="../assets/sign.png" alt="" />
     </div>
   </div>
 </template>
@@ -53,7 +53,7 @@ export default {
       const fog = new THREE.Fog(BG_COLOR, 1, 1000);
 
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(BG_COLOR);
+      //scene.background = new THREE.Color(BG_COLOR);
       const texture = new THREE.TextureLoader().load(cloud);
 
       // a flat shape
@@ -130,7 +130,8 @@ export default {
       mesh = new THREE.Mesh(mergedGeometry, material);
       // add to scene
       scene.add(mesh);
-      renderer = new THREE.WebGLRenderer({ antialias: false });
+      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+      renderer.setClearColor(0xffffff, 0);
       renderer.setSize(pageWidth, pageHeight);
       clouds.value.appendChild(renderer.domElement);
     }
@@ -188,25 +189,30 @@ export default {
   overflow-y: auto;
   perspective: 2px;
   position: relative;
+  background: #1e4877;
 }
 .clouds {
   width: 100%;
   height: 100vh;
   flex-shrink: 0;
-  background-image: linear-gradient(rgb(200, 240, 255), rgb(219, 255, 241));
 }
 
 .sign {
   height: 100%;
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: -1;
 }
 
 .sign__img {
   position: absolute;
-  max-width: 100%;
+  max-width: 50vh;
   height: auto;
   top: 50%;
-  right: 50%;
-  transform: translate(-50%, -50%) scale(1.3);
+  left: 50%;
+  transform: translate(-50%, -50%);
   background-size: 100%;
   z-index: -1;
   animation: reveal 2s;
