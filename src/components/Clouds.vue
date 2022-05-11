@@ -1,7 +1,8 @@
 <template>
   <div class="wrapper">
+    <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
     <div class="clouds" ref="clouds"></div>
-    <div class="sign" ref="sign">
+    <div class="sign" :class="{ isActive: revealSign }" ref="sign">
       <img class="sign__img" src="../assets/sign.png" alt="" />
     </div>
   </div>
@@ -12,21 +13,21 @@ import { ref, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
+import sign from "../assets/sign.png";
 
 // credit https://github.com/hezhongfeng/music163-demo
 
-// TODO: reveal sign when you reach the top of the page
+// TODO: window resize
 
 export default {
   setup() {
     const clouds = ref(null);
-    const START_TIME = Date.now();
     // number of clouds
-    const CLOUD_COUNT = 1000;
+    const CLOUD_COUNT = 30;
     // length of z-axis occupied by each Cloud
     const PER_CLOUD_Z = 15;
     // total z-axis length of all clouds
-    const CAMERA_POSITION_Z = CLOUD_COUNT * PER_CLOUD_Z;
+    const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
     // random parameters for x-axies and y-axis translation
     const RANDOM_POSITION_X = 80;
     const RANDOM_POSITION_Y = 120;
@@ -35,11 +36,9 @@ export default {
 
     const pageWidth = document.getElementById("app").clientWidth;
     const pageHeight = document.getElementById("app").clientHeight;
-    let scrollPosition = ref({
-      y: 0,
-      deltaY: 0,
-      position: 0,
-    });
+    let cameraPositionZ = ref(MAX_Z);
+    let revealSign = ref(false);
+    const deltaY = ref(0);
 
     let camera, scene, renderer, mesh;
 
@@ -48,7 +47,7 @@ export default {
       // the position of the camera, pan down left and right balance
       camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
       // initially at the furthest
-      camera.position.z = CAMERA_POSITION_Z;
+      camera.position.z = MAX_Z;
       // linear fog - the atomization effect increases linearly with distance
       const fog = new THREE.Fog(BG_COLOR, 1, 1000);
 
@@ -128,8 +127,21 @@ export default {
 
       // merge the above shapes and materials to generate an object
       mesh = new THREE.Mesh(mergedGeometry, material);
+
+      // create image
+      /*
+      const imgGeometry = new THREE.PlaneBufferGeometry(50, 50 * 1.250014);
+      const imgMaterial = new THREE.MeshBasicMaterial({
+        map: new THREE.TextureLoader().load(sign),
+        transparent: true,
+      });
+      const img = new THREE.Mesh(imgGeometry, imgMaterial);
+      img.position.set(1, 1, MAX_Z - 15);
+      */
+
       // add to scene
       scene.add(mesh);
+      //scene.add(img);
       renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
       renderer.setClearColor(0xffffff, 0);
       renderer.setSize(pageWidth, pageHeight);
@@ -138,34 +150,23 @@ export default {
 
     function animate() {
       // Start from the farthest z-axis and move forward little by little to achieve the purpose of crossing the clouds
-      let { position, deltaY } = scrollPosition.value;
-      position += deltaY;
-      camera.position.z = CAMERA_POSITION_Z - position;
-      /*camera.position.z =
-        CAMERA_POSITION_Z -
-        (((Date.now() - START_TIME) * 0.03) % CAMERA_POSITION_Z);*/
+      cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 30);
+      if (cameraPositionZ.value < 200) {
+        revealSign.value = true;
+      } else {
+        revealSign.value = false;
+      }
+      /*
+      const position = MAX_Z - deltaY.value;
+      cameraPositionZ.value =
+        position < 0 ? 0 : position > MAX_Z ? MAX_Z : position; */
+      camera.position.z = cameraPositionZ.value;
       renderer.render(scene, camera);
       requestAnimationFrame(animate);
     }
 
     function onWheel(e) {
-      scrollPosition.value.deltaY = e.wheelDeltaY || e.deltaY;
-      // reduce by half the delta amount otherwise it scroll too fast
-      scrollPosition.value.deltaY *= 0.5;
-
-      //scroll(e);
-    }
-
-    function scroll(e) {
-      let { position, deltaY } = scrollPosition.value;
-      if (position + deltaY > 0) {
-        position = 0;
-        // limit scroll bottom
-      } else if (-(position + deltaY) >= pageHeight) {
-        position = -pageHeight;
-      } else {
-        position += deltaY;
-      }
+      deltaY.value += (e.wheelDeltaY || e.deltaY) * -0.003;
     }
 
     onMounted(() => {
@@ -176,7 +177,8 @@ export default {
     onUnmounted(() => {
       document.body.removeEventListener("wheel", onWheel);
     });
-    return { clouds };
+
+    return { clouds, deltaY, cameraPositionZ, revealSign };
   },
 };
 </script>
@@ -186,7 +188,6 @@ export default {
   width: 100vw;
   height: 100vh;
   overflow: hidden;
-  overflow-y: auto;
   perspective: 2px;
   position: relative;
   background: #1e4877;
@@ -204,6 +205,13 @@ export default {
   top: 0;
   left: 0;
   z-index: -1;
+  display: none;
+}
+
+.sign.isActive {
+  display: block;
+  animation: reveal 2s;
+  animation-fill-mode: forwards;
 }
 
 .sign__img {
@@ -215,8 +223,13 @@ export default {
   transform: translate(-50%, -50%);
   background-size: 100%;
   z-index: -1;
-  animation: reveal 2s;
-  animation-fill-mode: forwards;
+}
+
+.wheel-delta {
+  position: fixed;
+  top: 50px;
+  height: 100vh;
+  width: 100vw;
 }
 
 @keyframes reveal {
@@ -231,7 +244,7 @@ export default {
   }
   100% {
     opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
+    transform: translate(0, -10%) scale(1);
   }
 }
 </style>

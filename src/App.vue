@@ -16,4 +16,10 @@ import Clouds from "./components/Clouds.vue";
   height: 100vh;
   position: relative;
 }
+
+body {
+  margin: 0;
+  height: 100vh;
+  width: 100vw;
+}
 </style>
