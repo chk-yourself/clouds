@@ -1,65 +1,64 @@
 <template>
   <div class="wrapper">
     <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
-    <div class="clouds" ref="clouds"></div>
-    <div class="sign" :class="{ isActive: revealSign }" ref="sign">
-      <img class="sign__img" src="../assets/sign.png" alt="" />
-    </div>
+    <div class="clouds-wrapper" ref="cloudsWrapper"></div>
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, onMounted, onUnmounted } from "vue";
+import { GUI } from "dat.gui";
 import * as THREE from "three";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
 import sign from "../assets/sign.png";
 
-// credit https://github.com/hezhongfeng/music163-demo
+// clouds credit: https://github.com/hezhongfeng/music163-demo
 
 // TODO: window resize
+// number of clouds
+const CLOUD_COUNT = 10;
+// length of z-axis occupied by each Cloud
+const PER_CLOUD_Z = 10;
+// total z-axis length of all clouds
+const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
+// random parameters for x-axies and y-axis translation
+const RANDOM_POSITION_X = 80;
+const RANDOM_POSITION_Y = 120;
+// background color - sky blue
+const BG_COLOR = "#1e4877";
 
-export default {
-  setup() {
-    const clouds = ref(null);
-    // number of clouds
-    const CLOUD_COUNT = 30;
-    // length of z-axis occupied by each Cloud
-    const PER_CLOUD_Z = 15;
-    // total z-axis length of all clouds
-    const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
-    // random parameters for x-axies and y-axis translation
-    const RANDOM_POSITION_X = 80;
-    const RANDOM_POSITION_Y = 120;
-    // background color - sky blue
-    const BG_COLOR = "#1e4877";
+const pageWidth = document.getElementById("app").clientWidth;
+const pageHeight = document.getElementById("app").clientHeight;
 
-    const pageWidth = document.getElementById("app").clientWidth;
-    const pageHeight = document.getElementById("app").clientHeight;
-    let cameraPositionZ = ref(MAX_Z);
-    let revealSign = ref(false);
-    const deltaY = ref(0);
+// State
+const cloudsWrapper = ref(null);
+const deltaY = ref(0);
+let cameraPositionZ = ref(MAX_Z);
 
-    let camera, scene, renderer, mesh;
+let camera, scene, renderer;
 
-    function init() {
-      camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
-      // the position of the camera, pan down left and right balance
-      camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
-      // initially at the furthest
-      camera.position.z = MAX_Z;
-      // linear fog - the atomization effect increases linearly with distance
-      const fog = new THREE.Fog(BG_COLOR, 1, 1000);
+function init() {
+  // Camera
+  camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
+  // the position of the camera, pan down left and right balance
+  camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  // initially at the furthest
+  camera.position.z = MAX_Z;
+  // rotate upward 45 degrees
+  camera.rotation.x = -45 * THREE.Math.DEG2RAD;
+  // linear fog - the atomization effect increases linearly with distance
+  const fog = new THREE.Fog(BG_COLOR, 1, 1000);
 
-      scene = new THREE.Scene();
-      //scene.background = new THREE.Color(BG_COLOR);
-      const texture = new THREE.TextureLoader().load(cloud);
+  scene = new THREE.Scene();
 
-      // a flat shape
-      const geometry = new THREE.PlaneGeometry(64, 64);
-      const geometries = [];
-
-      const vShader = `
+  // Clouds
+  const cloudTexture = new THREE.TextureLoader().load(cloud);
+  cloudTexture.magFilter = THREE.LinearMipMapLinearFilter;
+  cloudTexture.minFilter = THREE.LinearMipMapLinearFilter;
+  const cloudGeometry = new THREE.PlaneGeometry(64, 64);
+  const cloudGeometries = [];
+  const vShader = `
         varying vec2 vUv;
         void main()
         {
@@ -67,7 +66,7 @@ export default {
           gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
         }
       `;
-      const fShader = `
+  const fShader = `
         uniform sampler2D map;
         uniform vec3 fogColor;
         uniform float fogNear;
@@ -82,105 +81,174 @@ export default {
           gl_FragColor = mix( gl_FragColor, vec4( fogColor, gl_FragColor.w ), fogFactor );
         }
       `;
-      // texture material
-      const material = new THREE.ShaderMaterial({
-        // The value here is passed to the shader
-        uniforms: {
-          map: {
-            type: "t",
-            value: texture,
-          },
-          fogColor: {
-            type: "c",
-            value: fog.color,
-          },
-          fogNear: {
-            type: "f",
-            value: fog.near,
-          },
-          fogFar: {
-            type: "f",
-            value: fog.far,
-          },
-        },
-        vertexShader: vShader,
-        fragmentShader: fShader,
-        transparent: true,
-      });
+  const cloudMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      map: {
+        type: "t",
+        value: cloudTexture,
+      },
+      fogColor: {
+        type: "c",
+        value: fog.color,
+      },
+      fogNear: {
+        type: "f",
+        value: fog.near,
+      },
+      fogFar: {
+        type: "f",
+        value: fog.far,
+      },
+    },
+    vertexShader: vShader,
+    fragmentShader: fShader,
+    depthWrite: false,
+    depthTest: false,
+    transparent: true,
+  });
 
-      for (let i = 0; i < CLOUD_COUNT; i++) {
-        const instanceGeometry = geometry.clone();
+  for (let i = 0; i <= CLOUD_COUNT; i++) {
+    let cloudRow = [];
+    for (let j = 0; j <= 15; j++) {
+      let instanceGeometry;
+      if (i === CLOUD_COUNT) {
+        instanceGeometry = new THREE.PlaneGeometry(24, 24);
+        if (j % 2 === 0) {
+          instanceGeometry.translate(
+            Math.floor(RANDOM_POSITION_X / 2),
+            -17,
+            -5
+          );
+        } else {
+          instanceGeometry.translate(
+            Math.random() * RANDOM_POSITION_X,
+            (1 + Math.random()) * -16,
+            -5
+          );
+        }
+      } else {
+        instanceGeometry = cloudGeometry.clone();
         // After the X axis is offset, adjust the camera position to achieve balance
         // The Y axis wants to put the clouds in the lower position of the scene, so they are all negative values
         // Z-axis displacement is: the current number of clouds * the Z-axis length occupied by each cloud
         instanceGeometry.translate(
           Math.random() * RANDOM_POSITION_X,
           -Math.random() * RANDOM_POSITION_Y,
-          i * PER_CLOUD_Z
+          i * Math.random() * PER_CLOUD_Z
         );
-        geometries.push(instanceGeometry);
       }
-
-      // merch these shapes
-      const mergedGeometry =
-        BufferGeometryUtils.mergeBufferGeometries(geometries);
-
-      // merge the above shapes and materials to generate an object
-      mesh = new THREE.Mesh(mergedGeometry, material);
-
-      // create image
-      /*
-      const imgGeometry = new THREE.PlaneBufferGeometry(50, 50 * 1.250014);
-      const imgMaterial = new THREE.MeshBasicMaterial({
-        map: new THREE.TextureLoader().load(sign),
-        transparent: true,
-      });
-      const img = new THREE.Mesh(imgGeometry, imgMaterial);
-      img.position.set(1, 1, MAX_Z - 15);
-      */
-
-      // add to scene
-      scene.add(mesh);
-      //scene.add(img);
-      renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-      renderer.setClearColor(0xffffff, 0);
-      renderer.setSize(pageWidth, pageHeight);
-      clouds.value.appendChild(renderer.domElement);
+      cloudRow.push(instanceGeometry);
     }
+    cloudGeometries.push(...cloudRow);
+  }
 
-    function animate() {
-      // Start from the farthest z-axis and move forward little by little to achieve the purpose of crossing the clouds
-      cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 30);
-      if (cameraPositionZ.value < 200) {
-        revealSign.value = true;
-      } else {
-        revealSign.value = false;
-      }
-      /*
-      const position = MAX_Z - deltaY.value;
-      cameraPositionZ.value =
-        position < 0 ? 0 : position > MAX_Z ? MAX_Z : position; */
-      camera.position.z = cameraPositionZ.value;
-      renderer.render(scene, camera);
-      requestAnimationFrame(animate);
+  const mergedCloudGeometry =
+    BufferGeometryUtils.mergeBufferGeometries(cloudGeometries);
+
+  const clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
+  scene.add(clouds);
+
+  /*
+  const lastCloudGeometries = [];
+  for (let i = 0; i <= 20; i++) {
+    const cloud = new THREE.PlaneGeometry(24, 24);
+    if (i % 2 === 0) {
+      cloud.translate(Math.floor(RANDOM_POSITION_X / 2), -17, -5);
+    } else {
+      cloud.translate(
+        Math.random() * RANDOM_POSITION_X,
+        (1 + Math.random()) * -16,
+        -5
+      );
     }
+    lastCloudGeometries.push(cloud);
+  }
+  const mergedLastCloudGeometries =
+    BufferGeometryUtils.mergeBufferGeometries(lastCloudGeometries);
+  const cloudsBelowSign = new THREE.Mesh(
+    mergedLastCloudGeometries,
+    cloudMaterial
+  );
+  scene.add(cloudsBelowSign);
+  */
 
-    function onWheel(e) {
-      deltaY.value += (e.wheelDeltaY || e.deltaY) * -0.003;
-    }
+  // Sign
+  const signTexture = new THREE.TextureLoader().load(sign);
+  const sign3d = new THREE.Mesh(
+    new THREE.BoxGeometry(25, 25 * 1.250014),
+    new THREE.MeshBasicMaterial({
+      map: signTexture,
+      transparent: true,
+    })
+  );
+  sign3d.position.z = -20;
+  sign3d.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  scene.add(sign3d);
 
-    onMounted(() => {
-      init();
-      animate();
-      document.body.addEventListener("wheel", onWheel);
-    });
-    onUnmounted(() => {
-      document.body.removeEventListener("wheel", onWheel);
-    });
+  // Light
+  const light = new THREE.DirectionalLight(0xffffff, 1.0);
+  light.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, -10);
+  light.target.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, 0);
+  scene.add(light);
+  scene.add(light.target);
 
-    return { clouds, deltaY, cameraPositionZ, revealSign };
-  },
-};
+  let lightHelper = new THREE.DirectionalLightHelper(light, 5);
+  light.add(lightHelper);
+
+  const gui = new GUI();
+  const lightFolder = gui.addFolder("Light");
+  lightFolder.add(light.position, "x", 0);
+  lightFolder.add(light.position, "y", 0);
+  lightFolder.add(light.position, "z", 0);
+  lightFolder.open();
+
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+  renderer.setClearColor(0xffffff, 0);
+  renderer.setSize(pageWidth, pageHeight);
+  cloudsWrapper.value.appendChild(renderer.domElement);
+}
+
+function animate() {
+  cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 10);
+  if (cameraPositionZ.value <= 75) {
+    camera.rotation.x = Math.min(
+      0,
+      (-cameraPositionZ.value + 30) * THREE.Math.DEG2RAD
+    );
+  }
+  camera.position.z = cameraPositionZ.value;
+  renderer.render(scene, camera);
+  requestAnimationFrame(animate);
+}
+
+function onWheel(e) {
+  deltaY.value = Math.max(
+    0,
+    deltaY.value + (e.wheelDeltaY || e.deltaY) * -0.007
+  );
+}
+
+//TODO: FIX
+function onWindowResize(e) {
+  const pageWidth = document.getElementById("app").clientWidth;
+  const pageHeight = document.getElementById("app").clientHeight;
+  camera.aspect = pageWidth / pageHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(pageWidth, pageHeight);
+}
+
+onMounted(() => {
+  init();
+  animate();
+  document.body.addEventListener("wheel", onWheel);
+  document.body.addEventListener("resize", onWindowResize);
+});
+onUnmounted(() => {
+  document.body.removeEventListener("wheel", onWheel);
+  document.body.removeEventListener("resize", onWindowResize);
+});
 </script>
 
 <style scoped>
@@ -192,7 +260,7 @@ export default {
   position: relative;
   background: #1e4877;
 }
-.clouds {
+.clouds-wrapper {
   width: 100%;
   height: 100vh;
   flex-shrink: 0;
@@ -208,43 +276,10 @@ export default {
   display: none;
 }
 
-.sign.isActive {
-  display: block;
-  animation: reveal 2s;
-  animation-fill-mode: forwards;
-}
-
-.sign__img {
-  position: absolute;
-  max-width: 50vh;
-  height: auto;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background-size: 100%;
-  z-index: -1;
-}
-
 .wheel-delta {
   position: fixed;
   top: 50px;
   height: 100vh;
   width: 100vw;
-}
-
-@keyframes reveal {
-  0% {
-    opacity: 0;
-  }
-  50% {
-    opacity: 0;
-  }
-  51% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 1;
-    transform: translate(0, -10%) scale(1);
-  }
 }
 </style>
