@@ -195,12 +195,16 @@ function init() {
   let lightHelper = new THREE.DirectionalLightHelper(light, 5);
   light.add(lightHelper);
 
+  /**
+  GUI
+
   const gui = new GUI();
   const lightFolder = gui.addFolder("Light");
   lightFolder.add(light.position, "x", 0);
   lightFolder.add(light.position, "y", 0);
   lightFolder.add(light.position, "z", 0);
   lightFolder.open();
+  **/
 
   // Renderer
   renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
