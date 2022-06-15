@@ -9,6 +9,7 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import { GUI } from "dat.gui";
 import * as THREE from "three";
+import { Sky } from "../assets/sky.js";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
 import sign from "../assets/sign.png";
@@ -37,6 +38,7 @@ const deltaY = ref(0);
 let cameraPositionZ = ref(MAX_Z);
 
 let camera, scene, renderer;
+let sky, sun, clouds;
 
 function init() {
   // Camera
@@ -145,7 +147,8 @@ function init() {
   const mergedCloudGeometry =
     BufferGeometryUtils.mergeBufferGeometries(cloudGeometries);
 
-  const clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
+  clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
+  clouds.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene.add(clouds);
 
   // Sign
@@ -168,8 +171,8 @@ function init() {
   scene.add(light);
   scene.add(light.target);
 
-  let lightHelper = new THREE.DirectionalLightHelper(light, 5);
-  light.add(lightHelper);
+  //let lightHelper = new THREE.DirectionalLightHelper(light, 5);
+  //light.add(lightHelper);
 
   // Background
 
@@ -185,7 +188,7 @@ function init() {
     scene.add(star);
   }
 
-  Array(200).fill().forEach(addStar);
+  //Array(200).fill().forEach(addStar);
 
   /**
   GUI
@@ -208,10 +211,12 @@ function init() {
 function animate() {
   cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 10);
   if (cameraPositionZ.value <= 75) {
-    camera.rotation.x = Math.min(
+    const deltaX = Math.min(
       0,
       (-cameraPositionZ.value + 30) * THREE.Math.DEG2RAD
     );
+    camera.rotation.x = deltaX;
+    clouds.rotation.x = deltaX;
   }
   camera.position.z = cameraPositionZ.value;
   renderer.render(scene, camera);
@@ -236,8 +241,66 @@ function onWindowResize(e) {
   renderer.render(scene, camera);
 }
 
+// Sky
+function initSky() {
+  // Add Sky
+  sky = new Sky();
+  sky.scale.setScalar(450000);
+  scene.add(sky);
+
+  sun = new THREE.Vector3();
+
+  /// GUI
+
+  const effectController = {
+    turbidity: 10,
+    rayleigh: 3,
+    mieCoefficient: 0.005,
+    mieDirectionalG: 0.7,
+    elevation: 2,
+    azimuth: 180,
+    exposure: renderer.toneMappingExposure,
+  };
+
+  function guiChanged() {
+    const uniforms = sky.material.uniforms;
+    uniforms["turbidity"].value = effectController.turbidity;
+    uniforms["rayleigh"].value = effectController.rayleigh;
+    uniforms["mieCoefficient"].value = effectController.mieCoefficient;
+    uniforms["mieDirectionalG"].value = effectController.mieDirectionalG;
+
+    const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
+    const theta = THREE.MathUtils.degToRad(effectController.azimuth);
+
+    sun.setFromSphericalCoords(1, phi, theta);
+
+    uniforms["sunPosition"].value.copy(sun);
+
+    renderer.toneMappingExposure = effectController.exposure;
+    renderer.render(scene, camera);
+  }
+
+  /*
+  const gui = new GUI();
+
+  gui.add(effectController, "turbidity", 0.0, 20.0, 0.1).onChange(guiChanged);
+  gui.add(effectController, "rayleigh", 0.0, 4, 0.001).onChange(guiChanged);
+  gui
+    .add(effectController, "mieCoefficient", 0.0, 0.1, 0.001)
+    .onChange(guiChanged);
+  gui
+    .add(effectController, "mieDirectionalG", 0.0, 1, 0.001)
+    .onChange(guiChanged);
+  gui.add(effectController, "elevation", 0, 90, 0.1).onChange(guiChanged);
+  gui.add(effectController, "azimuth", -180, 180, 0.1).onChange(guiChanged);
+  gui.add(effectController, "exposure", 0, 1, 0.0001).onChange(guiChanged);
+*/
+  guiChanged();
+}
+
 onMounted(() => {
   init();
+  initSky();
   animate();
   document.body.addEventListener("wheel", onWheel);
   document.body.addEventListener("resize", onWindowResize);
