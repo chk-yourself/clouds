@@ -148,30 +148,6 @@ function init() {
   const clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
   scene.add(clouds);
 
-  /*
-  const lastCloudGeometries = [];
-  for (let i = 0; i <= 20; i++) {
-    const cloud = new THREE.PlaneGeometry(24, 24);
-    if (i % 2 === 0) {
-      cloud.translate(Math.floor(RANDOM_POSITION_X / 2), -17, -5);
-    } else {
-      cloud.translate(
-        Math.random() * RANDOM_POSITION_X,
-        (1 + Math.random()) * -16,
-        -5
-      );
-    }
-    lastCloudGeometries.push(cloud);
-  }
-  const mergedLastCloudGeometries =
-    BufferGeometryUtils.mergeBufferGeometries(lastCloudGeometries);
-  const cloudsBelowSign = new THREE.Mesh(
-    mergedLastCloudGeometries,
-    cloudMaterial
-  );
-  scene.add(cloudsBelowSign);
-  */
-
   // Sign
   const signTexture = new THREE.TextureLoader().load(sign);
   const sign3d = new THREE.Mesh(
@@ -241,6 +217,7 @@ function onWindowResize(e) {
   camera.updateProjectionMatrix();
 
   renderer.setSize(pageWidth, pageHeight);
+  renderer.render(scene, camera);
 }
 
 onMounted(() => {
@@ -267,7 +244,13 @@ onUnmounted(() => {
 .clouds-wrapper {
   width: 100%;
   height: 100vh;
+  position: relative;
   flex-shrink: 0;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
 }
 
 .sign {
