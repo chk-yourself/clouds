@@ -1,12 +1,14 @@
 {
   "name": "clouds",
   "version": "0.0.0",
+  "homepage": "http://chk-yourself.github.io/clouds",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 5050",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore",
-    "deploy": "sh deploy.sh"
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build"
   },
   "dependencies": {
     "dat.gui": "^0.7.9",
@@ -20,6 +22,7 @@
     "@vue/eslint-config-prettier": "^7.0.0",
     "eslint": "^8.5.0",
     "eslint-plugin-vue": "^8.2.0",
+    "gh-pages": "^4.0.0",
     "prettier": "^2.5.1",
     "vite": "^2.9.5"
   }

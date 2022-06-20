@@ -58,7 +58,7 @@ function init() {
   const cloudTexture = new THREE.TextureLoader().load(cloud);
   cloudTexture.magFilter = THREE.LinearMipMapLinearFilter;
   cloudTexture.minFilter = THREE.LinearMipMapLinearFilter;
-  const cloudGeometry = new THREE.PlaneGeometry(64, 64);
+  const cloudGeometry = new THREE.PlaneGeometry(50, 50);
   const cloudGeometries = [];
   const vShader = `
         varying vec2 vUv;
@@ -114,14 +114,15 @@ function init() {
     for (let j = 0; j <= 15; j++) {
       let instanceGeometry;
       if (i === CLOUD_COUNT) {
-        instanceGeometry = new THREE.PlaneGeometry(24, 24);
+        instanceGeometry = new THREE.PlaneGeometry(32, 32);
         if (j % 2 === 0) {
           instanceGeometry.translate(
             Math.floor(RANDOM_POSITION_X / 2),
-            -17,
+            -20,
             -5
           );
         } else {
+          instanceGeometry = new THREE.PlaneGeometry(48, 48);
           instanceGeometry.translate(
             Math.random() * RANDOM_POSITION_X,
             (1 + Math.random()) * -16,
@@ -210,10 +211,10 @@ function init() {
 
 function animate() {
   cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 10);
-  if (cameraPositionZ.value <= 75) {
+  if (cameraPositionZ.value <= 60) {
     const deltaX = Math.min(
       0,
-      (-cameraPositionZ.value + 30) * THREE.Math.DEG2RAD
+      (-cameraPositionZ.value + 15) * THREE.Math.DEG2RAD
     );
     camera.rotation.x = deltaX;
     clouds.rotation.x = deltaX;
