@@ -1,8 +1,6 @@
 <template>
-  <div class="wrapper">
-    <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
-    <div class="clouds-wrapper" ref="cloudsWrapper"></div>
-  </div>
+  <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
+  <div class="clouds-wrapper" ref="cloudsWrapper"></div>
 </template>
 
 <script setup>
@@ -16,7 +14,6 @@ import sign from "../assets/sign.png";
 
 // clouds credit: https://github.com/hezhongfeng/music163-demo
 
-// TODO: window resize
 // number of clouds
 const CLOUD_COUNT = 10;
 // length of z-axis occupied by each Cloud
@@ -228,7 +225,6 @@ function onWheel(e) {
   );
 }
 
-//TODO: FIX
 function onWindowResize(e) {
   const pageWidth = document.getElementById("app").clientWidth;
   const pageHeight = document.getElementById("app").clientHeight;
@@ -310,19 +306,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.wrapper {
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden;
-  perspective: 2px;
-  position: relative;
-  background: #1e4877;
-}
 .clouds-wrapper {
   width: 100%;
   height: 100vh;
   position: relative;
-  flex-shrink: 0;
 }
 
 canvas {
