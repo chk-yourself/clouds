@@ -301,11 +301,11 @@ onMounted(() => {
   initSky();
   animate();
   document.body.addEventListener("wheel", onWheel);
-  document.body.addEventListener("resize", onWindowResize);
+  window.addEventListener("resize", onWindowResize);
 });
 onUnmounted(() => {
   document.body.removeEventListener("wheel", onWheel);
-  document.body.removeEventListener("resize", onWindowResize);
+  window.removeEventListener("resize", onWindowResize);
 });
 </script>
 
