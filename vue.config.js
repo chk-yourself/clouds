@@ -1,3 +1,3 @@
 module.exports = {
-  publicPath: '/clouds/',
+  publicPath: '/clouds/'
 };
