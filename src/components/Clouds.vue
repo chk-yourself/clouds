@@ -172,9 +172,6 @@ function init() {
   scene.add(light);
   scene.add(light.target);
 
-  //let lightHelper = new THREE.DirectionalLightHelper(light, 5);
-  //light.add(lightHelper);
-
   // Background
 
   // Stars
