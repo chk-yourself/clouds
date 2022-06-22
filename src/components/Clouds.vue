@@ -233,8 +233,7 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   const touch = e.targetTouches ? e.targetTouches[0] : e;
-  // the multiply factor on mobile must be about 10x the factor applied on the wheel
-  deltaY.value = (touch.pageY - touchStartY.value) * 5;
+  deltaY.value = touch.pageY + touchStartY.value;
   touchStartY.value = touch.pageY;
 }
 
