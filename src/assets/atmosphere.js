@@ -1,382 +1,34 @@
-<template>
-  <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
-  <div class="clouds-wrapper" ref="cloudsWrapper"></div>
-</template>
-
-<script setup>
-import { ref, onMounted, onUnmounted } from "vue";
-import { GUI } from "dat.gui";
-import * as THREE from "three";
-import Sky from "../assets/sky.js";
-import DynamicSky from "../assets/dynamicSky";
-import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import cloud from "../assets/cloud.png";
-import sign from "../assets/sign.png";
-import CloudShader from "../assets/CloudShader.js";
-import noise from "../assets/rgba-noise.png";
-
-// clouds credit: https://github.com/hezhongfeng/music163-demo
-
-// number of clouds
-const CLOUD_COUNT = 10;
-// length of z-axis occupied by each Cloud
-const PER_CLOUD_Z = 10;
-// total z-axis length of all clouds
-const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
-// random parameters for x-axies and y-axis translation
-const RANDOM_POSITION_X = 80;
-const RANDOM_POSITION_Y = 120;
-// background color - sky blue
-const BG_COLOR = "#1e4877";
-
-const pageWidth = document.getElementById("app").clientWidth;
-const pageHeight = document.getElementById("app").clientHeight;
-
-// State
-const cloudsWrapper = ref(null);
-const deltaY = ref(0);
-const touchStartY = ref(0);
-let cameraPositionZ = ref(MAX_Z);
-
-let camera, scene, renderer;
-let sky, sun, clouds, skyMaterial;
-let action;
-const mouse = new THREE.Vector2();
-const raycaster = new THREE.Raycaster();
-
-function init() {
-  // Camera
-  camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
-  // the position of the camera, pan down left and right balance
-  camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
-  // initially at the furthest
-  camera.position.z = MAX_Z;
-  // rotate upward 45 degrees
-  camera.rotation.x = -45 * THREE.Math.DEG2RAD;
-  // linear fog - the atomization effect increases linearly with distance
-  const fog = new THREE.Fog(BG_COLOR, 1, 1000);
-
-  scene = new THREE.Scene();
-
-  // Clouds
-  const cloudTexture = new THREE.TextureLoader().load(cloud);
-  cloudTexture.magFilter = THREE.LinearMipMapLinearFilter;
-  cloudTexture.minFilter = THREE.LinearMipMapLinearFilter;
-  const cloudGeometry = new THREE.PlaneGeometry(50, 50);
-  const cloudGeometries = [];
-  const vShader = `
-        varying vec2 vUv;
-        void main()
-        {
-          vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-        }
-      `;
-  const fShader = `
-        uniform sampler2D map;
-        uniform vec3 fogColor;
-        uniform float fogNear;
-        uniform float fogFar;
-        varying vec2 vUv;
-        void main()
-        {
-          float depth = gl_FragCoord.z / gl_FragCoord.w;
-          float fogFactor = smoothstep( fogNear, fogFar, depth );
-          gl_FragColor = texture2D(map, vUv );
-          gl_FragColor.w *= pow( gl_FragCoord.z, 20.0 );
-          gl_FragColor = mix( gl_FragColor, vec4( fogColor, gl_FragColor.w ), fogFactor );
-        }
-      `;
-  const cloudMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      map: {
-        type: "t",
-        value: cloudTexture,
-      },
-      fogColor: {
-        type: "c",
-        value: fog.color,
-      },
-      fogNear: {
-        type: "f",
-        value: fog.near,
-      },
-      fogFar: {
-        type: "f",
-        value: fog.far,
-      },
-    },
-    vertexShader: vShader,
-    fragmentShader: fShader,
-    depthWrite: false,
-    depthTest: false,
-    transparent: true,
-  });
-
-  for (let i = 0; i <= CLOUD_COUNT; i++) {
-    let cloudRow = [];
-    for (let j = 0; j <= 12; j++) {
-      let instanceGeometry;
-      if (i === CLOUD_COUNT) {
-        instanceGeometry = new THREE.PlaneGeometry(32, 32);
-        if (j % 2 === 0) {
-          instanceGeometry.translate(
-            Math.floor(RANDOM_POSITION_X / 2),
-            -20,
-            -5
-          );
-        } else {
-          instanceGeometry = new THREE.PlaneGeometry(48, 48);
-          instanceGeometry.translate(
-            Math.random() * RANDOM_POSITION_X,
-            (1 + Math.random()) * -16,
-            -5
-          );
-        }
-      } else {
-        instanceGeometry = cloudGeometry.clone();
-        // After the X axis is offset, adjust the camera position to achieve balance
-        // The Y axis wants to put the clouds in the lower position of the scene, so they are all negative values
-        // Z-axis displacement is: the current number of clouds * the Z-axis length occupied by each cloud
-        instanceGeometry.translate(
-          Math.random() * RANDOM_POSITION_X,
-          -Math.random() * RANDOM_POSITION_Y,
-          i * Math.random() * PER_CLOUD_Z
-        );
-      }
-      cloudRow.push(instanceGeometry);
-    }
-    cloudGeometries.push(...cloudRow);
-  }
-
-  const mergedCloudGeometry =
-    BufferGeometryUtils.mergeBufferGeometries(cloudGeometries);
-
-  clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
-  clouds.rotation.x = -45 * THREE.Math.DEG2RAD;
-  scene.add(clouds);
-
-  // Light
-  const light = new THREE.DirectionalLight(0xffffff, 1.0);
-  light.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, -10);
-  light.target.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, 0);
-  scene.add(light);
-  scene.add(light.target);
-
-  // Background
-
-  // Stars
-  function addStar() {
-    const geometry = new THREE.SphereGeometry(0.25, 24, 24);
-    const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    const star = new THREE.Mesh(geometry, material);
-    const [x, y, z] = Array(3)
-      .fill()
-      .map(() => THREE.MathUtils.randFloatSpread(100));
-    star.position.set(x, y, z);
-    scene.add(star);
-  }
-
-  //Array(200).fill().forEach(addStar);
-
-  /**
-  GUI
-
-  const gui = new GUI();
-  const lightFolder = gui.addFolder("Light");
-  lightFolder.add(light.position, "x", 0);
-  lightFolder.add(light.position, "y", 0);
-  lightFolder.add(light.position, "z", 0);
-  lightFolder.open();
-  **/
-
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-  renderer.setClearColor(0xffffff, 0);
-  renderer.setSize(pageWidth, pageHeight);
-  cloudsWrapper.value.appendChild(renderer.domElement);
-}
-
-// Sign
-
-function initSign() {
-  const signTexture = new THREE.TextureLoader().load(sign);
-  const sign3d = new THREE.Mesh(
-    new THREE.BoxGeometry(25, 25 * 1.250014),
-    new THREE.MeshBasicMaterial({
-      map: signTexture,
-      transparent: true,
-    })
-  );
-  sign3d.position.z = -20;
-  sign3d.position.x = Math.floor(RANDOM_POSITION_X / 2);
-  scene.add(sign3d);
-}
-
-function animate() {
-  cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 10);
-  if (cameraPositionZ.value <= 60) {
-    const deltaX = Math.min(
-      0,
-      (-cameraPositionZ.value + 15) * THREE.Math.DEG2RAD
-    );
-    camera.rotation.x = deltaX;
-    clouds.rotation.x = deltaX;
-    skyMaterial.uniforms.iTime.value += 1; //update the time uniform in the shader
-  }
-  camera.position.z = cameraPositionZ.value;
-  renderer.render(scene, camera);
-  requestAnimationFrame(animate);
-}
-
-// Event Listeners
-
-function onWheel(e) {
-  deltaY.value = Math.max(
-    0,
-    deltaY.value + (e.wheelDeltaY || e.deltaY) * -0.007
-  );
-}
-
-function onTouchStart(e) {
-  const touch = e.targetTouches ? e.targetTouches[0] : e;
-  touchStartY.value = touch.pageY;
-}
-
-function onTouchMove(e) {
-  const touch = e.targetTouches ? e.targetTouches[0] : e;
-  deltaY.value = touch.pageY + touchStartY.value;
-  touchStartY.value = touch.pageY;
-}
-
-function onWindowResize(e) {
-  let renderWidth = window.innerWidth;
-  let renderHeight = window.innerHeight;
-  camera.aspect = renderWidth / renderHeight;
-  camera.aspect = THREE.MathUtils.clamp(camera.aspect, 9 / 16, 16 / 9);
-  camera.updateProjectionMatrix();
-
-  if (renderWidth / renderHeight > 16 / 9) {
-    renderHeight = (renderWidth * 9) / 16;
-  }
-  if (renderWidth / renderHeight < 9 / 16) {
-    renderWidth = (renderHeight * 9) / 16;
-  }
-
-  renderer.setSize(renderWidth, renderHeight);
-  renderer.setPixelRatio(Math.max(1, window.devicePixelRatio));
-  skyMaterial.uniforms.iResolution.value.set(2000, 500);
-  renderer.render(scene, camera);
-}
-
-function onMouseMove(e) {
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  skyMaterial.uniforms.iMouse.value.set(
-    e.clientX,
-    e.target.clientHeight - e.clientY
-  );
-}
-
-function onMouseDown(e) {
-  raycaster.setFromCamera(mouse, camera);
-  const intersects = raycaster.intersectObjects(scene.children);
-  for (let i = 0; i < intersects.length; i++) {
-    if (!intersects[i].object.material.color) break;
-    intersects[i].object.material.color.set(Math.random() * 0x1000000);
-    if (!action) {
-      //First time through.. make a new action...
-      const clip = animations[0];
-      action = mixer.clipAction(clip);
-      action.loop = THREE.LoopForever;
-      action.play();
-    } //On subsequent clicks.. just make the current action restart (reset)
-    else action.reset();
-    break;
-  }
-}
-
-// Sky
-function initSky() {
-  // Add Sky
-  sky = new Sky();
-  sky.scale.setScalar(450000);
-  scene.add(sky);
-
-  sun = new THREE.Vector3();
-
-  /// GUI
-
-  const effectController = {
-    turbidity: 10,
-    rayleigh: 3,
-    mieCoefficient: 0.005,
-    mieDirectionalG: 0.7,
-    elevation: 2,
-    azimuth: 180,
-    exposure: renderer.toneMappingExposure,
-  };
-
-  function guiChanged() {
-    const uniforms = sky.material.uniforms;
-    uniforms["turbidity"].value = effectController.turbidity;
-    uniforms["rayleigh"].value = effectController.rayleigh;
-    uniforms["mieCoefficient"].value = effectController.mieCoefficient;
-    uniforms["mieDirectionalG"].value = effectController.mieDirectionalG;
-
-    const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
-    const theta = THREE.MathUtils.degToRad(effectController.azimuth);
-
-    sun.setFromSphericalCoords(1, phi, theta);
-
-    uniforms["sunPosition"].value.copy(sun);
-
-    renderer.toneMappingExposure = effectController.exposure;
-    renderer.render(scene, camera);
-  }
-
-  /*
-  const gui = new GUI();
-
-  gui.add(effectController, "turbidity", 0.0, 20.0, 0.1).onChange(guiChanged);
-  gui.add(effectController, "rayleigh", 0.0, 4, 0.001).onChange(guiChanged);
-  gui
-    .add(effectController, "mieCoefficient", 0.0, 0.1, 0.001)
-    .onChange(guiChanged);
-  gui
-    .add(effectController, "mieDirectionalG", 0.0, 1, 0.001)
-    .onChange(guiChanged);
-  gui.add(effectController, "elevation", 0, 90, 0.1).onChange(guiChanged);
-  gui.add(effectController, "azimuth", -180, 180, 0.1).onChange(guiChanged);
-  gui.add(effectController, "exposure", 0, 1, 0.0001).onChange(guiChanged);
+/*
+Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
 */
-  guiChanged();
-}
+import * as THREE from "three";
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 
-function initDynamicSky() {
-  const textureLoader = new THREE.TextureLoader();
+        
 
-  /*create a shader material with a standard vertexShader. Pass the */
-  skyMaterial = new THREE.ShaderMaterial({
-    uniforms: {
-      iTime: { value: 0 },
-      iChannel0: {
-        type: "sampler2D",
-        value: textureLoader.load(
-          noise,
-          //"https://www.shadertoy.com/media/shaders/XlscD8.jpg",
-          (tex) => {
-            tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-          }
-        ),
-      },
-      iResolution: {
-        type: "v2",
-        value: new THREE.Vector2(window.innerWidth, window.innerHeight),
-      },
-      iMouse: { type: "vec2", value: new THREE.Vector2() },
-    },
-    vertexShader: `
+
+const renderer = new THREE.WebGLRenderer({antialias:true});
+renderer.setSize( window.innerWidth, window.innerHeight );
+document.body.appendChild( renderer.domElement );
+/*
+const controls = new THREE.OrbitControls( camera, renderer.domElement );
+controls.target.set( 0, 0, 0 );
+controls.update(); 
+*/
+
+const textureLoader = new THREE.TextureLoader();
+textureLoader.crossOrigin = '';//this is just to load from imgur
+
+/*create a shader material with a standard vertexShader. Pass the */
+const shaderMaterial = new THREE.ShaderMaterial({
+  uniforms: {
+    iTime: {value:0},
+    iChannel0:{value:textureLoader.load("https://i.imgur.com/ugXTe2z.jpg")},
+    iResolution: { type: 'v2', value: new THREE.Vector2(2048,1024) },
+    iMouse:{value:new THREE.Vector2(0,0)}
+  },
+  vertexShader: `
     varying vec2 vUv;
         
     void main()
@@ -386,18 +38,39 @@ function initDynamicSky() {
       vUv = uv;
     }
   `,
-    fragmentShader: `
+  fragmentShader: `
   
     //bring in your uniforms of time and the two textures to use in the shader
     uniform float iTime;
     uniform sampler2D iChannel0;
     uniform vec2 iResolution;
-    
     uniform vec2 iMouse;
     
     //get the uv from the vertex shader above
     varying vec2 vUv;
     
+// The sun, the sky and the clouds. By StillTravelling
+// https://www.shadertoy.com/view/tdSXzD
+// Very much a messy hack sorry!!
+
+// Many Thank yous go to the below for their amazing work
+// Day and night sky cycle. By László Matuska (@BitOfGold)
+// Creates a sky texture for a skydome
+// https://www.shadertoy.com/view/ltlSWB
+
+// Weather. By David Hoskins, May 2014.
+// https://www.shadertoy.com/view/4dsXWn
+
+// Edge of atmosphere
+// created by dmytro rubalskyi (ruba)
+// https://www.shadertoy.com/view/XlXGzB
+
+// Auroras
+// created by nimitz
+// https://www.shadertoy.com/view/XtGGRt
+
+// Sorry to those I've missed out!!
+
 #define ORIG_CLOUD 0
 #define ENABLE_RAIN 0 //enable rain drops on screen
 #define SIMPLE_SUN 0
@@ -833,7 +506,7 @@ vec2 GetDrops(vec2 uv, float seed, float m) {
 }
 //END RAIN STUFF
 
-void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
+void main( ) {
 
 	float AR = iResolution.x/iResolution.y;
     float M = 1.0; //canvas.innerWidth/M //canvas.innerHeight/M --res
@@ -841,7 +514,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
     vec2 uvMouse = (iMouse.xy / iResolution.xy);
     uvMouse.x *= AR;
     
-   	vec2 uv0 = (fragCoord.xy / iResolution.xy);
+   	vec2 uv0 = vUv;
     uv0 *= M;
 	//uv0.x *= AR;
     
@@ -931,74 +604,58 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
     #endif
 
 	//float env = pow( smoothstep(.5, iResolution.x / iResolution.y, length(uv*0.8)), 0.0);
-	fragColor = vec4(pow(color, vec3(1.0/2.2)), 1.); //gamma correct
-}
-
-void main() {
-vec4 fragCoord = gl_FragCoord;
-mainImage(gl_FragColor,(vUv.xy)*iResolution);
-	//gl_FragColor = vec4(pow(gl_FragColor.rgb, vec3(1.0/2.2)), 1.); //gamma correct
+	gl_FragColor = vec4(pow(color, vec3(1.0/2.2)), 1.); //gamma correct
 }
   `,
-    wireframe: false,
-    side: THREE.DoubleSide,
-  });
-  const planeGeometry = new THREE.PlaneGeometry(200, 100);
-  const plane = new THREE.Mesh(planeGeometry, skyMaterial); //create a plane to add the shader to
-  plane.position.z = -20;
-  scene.add(plane);
-}
-
-onMounted(() => {
-  init();
-  //initSky();
-  initDynamicSky();
-  initSign();
-  animate();
-  document.body.addEventListener("wheel", onWheel);
-  document.body.addEventListener("touchstart", onTouchStart);
-  document.body.addEventListener("touchmove", onTouchMove);
-  window.addEventListener("resize", onWindowResize);
-  window.addEventListener("mousemove", onMouseMove, false);
-  window.addEventListener("mousedown", onMouseDown, false);
+  wireframe: false
 });
-onUnmounted(() => {
-  document.body.removeEventListener("wheel", onWheel);
-  document.body.removeEventListener("touchstart", onTouchStart);
-  document.body.removeEventListener("touchmove", onTouchMove);
-  window.removeEventListener("resize", onWindowResize);
-  window.removeEventListener("mousemove", onMouseMove);
-  window.removeEventListener("mousedown", onMouseDown);
-});
-</script>
 
-<style scoped>
-.clouds-wrapper {
-  width: 100%;
-  height: 100vh;
-  position: relative;
-  overflow: hidden;
+document.body.addEventListener("mousemove", mouseHandler);
+
+function mouseHandler(event){
+      var rect = event.target.getBoundingClientRect();
+  const mouseX = (event.pageX - rect.left);///rect.width;
+  const mouseY = (event.pageY - rect.top);///rect.height;
+  shaderMaterial.uniforms.iMouse.value.x = mouseX;
+  shaderMaterial.uniforms.iMouse.value.y = mouseY;
+}
+const planeGeometry = new THREE.PlaneGeometry( 200, 100 );
+const plane = new THREE.Mesh( planeGeometry, shaderMaterial );//create a plane to add the shader to
+scene.add(plane);
+
+camera.position.z = 100;
+
+function animate() {
+  requestAnimationFrame( animate );
+  shaderMaterial.uniforms.iTime.value += 0.1;//update the time uniform in the shader
+  renderer.render( scene, camera );
+};
+
+animate();
+
+/*handle resizing */
+
+function onWindowResize(){
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.aspect = THREE.MathUtils.clamp(camera.aspect, 9/16, 16/9);
+		camera.updateProjectionMatrix();
+
+
+  let renderWidth = window.innerWidth;
+  let renderHeight = window.innerHeight;
+
+  if(renderWidth/renderHeight>16/9){
+    renderHeight = renderWidth*9/16;
+  }
+  if(renderWidth/renderHeight<9/16){
+    renderWidth = renderHeight*9/16;
+  }
+		renderer.setSize(renderWidth, renderHeight );
+		renderer.setPixelRatio( Math.max(1, window.devicePixelRatio));
+shaderMaterial.uniforms.iResolution.x = renderWidth;
+shaderMaterial.uniforms.iResolution.y = renderHeight;
 }
 
-canvas {
-  width: 100%;
-  height: 100%;
-}
+window.addEventListener("resize", onWindowResize);
+onWindowResize();
 
-.sign {
-  height: 100%;
-  width: 100%;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: -1;
-  display: none;
-}
-
-.wheel-delta {
-  position: fixed;
-  top: 50px;
-  height: 100vh;
-  width: 100vw;
-}
-</style>
