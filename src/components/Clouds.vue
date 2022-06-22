@@ -32,6 +32,7 @@ const pageHeight = document.getElementById("app").clientHeight;
 // State
 const cloudsWrapper = ref(null);
 const deltaY = ref(0);
+const touchStartY = ref(0);
 let cameraPositionZ = ref(MAX_Z);
 
 let camera, scene, renderer;
@@ -108,7 +109,7 @@ function init() {
 
   for (let i = 0; i <= CLOUD_COUNT; i++) {
     let cloudRow = [];
-    for (let j = 0; j <= 15; j++) {
+    for (let j = 0; j <= 12; j++) {
       let instanceGeometry;
       if (i === CLOUD_COUNT) {
         instanceGeometry = new THREE.PlaneGeometry(32, 32);
@@ -225,6 +226,18 @@ function onWheel(e) {
   );
 }
 
+function onTouchStart(e) {
+  const touch = e.targetTouches ? e.targetTouches[0] : e;
+  touchStartY.value = touch.pageY;
+}
+
+function onTouchMove(e) {
+  const touch = e.targetTouches ? e.targetTouches[0] : e;
+  // the multiply factor on mobile must be about 10x the factor applied on the wheel
+  deltaY.value = (touch.pageY - touchStartY.value) * 5;
+  touchStartY.value = touch.pageY;
+}
+
 function onWindowResize(e) {
   const pageWidth = document.getElementById("app").clientWidth;
   const pageHeight = document.getElementById("app").clientHeight;
@@ -297,10 +310,14 @@ onMounted(() => {
   initSky();
   animate();
   document.body.addEventListener("wheel", onWheel);
+  document.body.addEventListener("touchstart", onTouchStart);
+  document.body.addEventListener("touchmove", onTouchMove);
   window.addEventListener("resize", onWindowResize);
 });
 onUnmounted(() => {
   document.body.removeEventListener("wheel", onWheel);
+  document.body.removeEventListener("touchstart", onTouchStart);
+  document.body.removeEventListener("touchmove", onTouchMove);
   window.removeEventListener("resize", onWindowResize);
 });
 </script>
