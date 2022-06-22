@@ -15,7 +15,11 @@ import sign from "../assets/sign.png";
 import CloudShader from "../assets/CloudShader.js";
 import noise from "../assets/rgba-noise.png";
 
-// clouds credit: https://github.com/hezhongfeng/music163-demo
+//
+/*
+clouds credit: https://github.com/hezhongfeng/music163-demo
+Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
+*/
 
 // number of clouds
 const CLOUD_COUNT = 10;
@@ -29,8 +33,8 @@ const RANDOM_POSITION_Y = 120;
 // background color - sky blue
 const BG_COLOR = "#1e4877";
 
-const pageWidth = document.getElementById("app").clientWidth;
-const pageHeight = document.getElementById("app").clientHeight;
+const pageWidth = window.innerWidth;
+const pageHeight = window.innerHeight;
 
 // State
 const cloudsWrapper = ref(null);
@@ -165,20 +169,6 @@ function init() {
 
   // Background
 
-  // Stars
-  function addStar() {
-    const geometry = new THREE.SphereGeometry(0.25, 24, 24);
-    const material = new THREE.MeshStandardMaterial({ color: 0xffffff });
-    const star = new THREE.Mesh(geometry, material);
-    const [x, y, z] = Array(3)
-      .fill()
-      .map(() => THREE.MathUtils.randFloatSpread(100));
-    star.position.set(x, y, z);
-    scene.add(star);
-  }
-
-  //Array(200).fill().forEach(addStar);
-
   /**
   GUI
 
@@ -191,7 +181,7 @@ function init() {
   **/
 
   // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setClearColor(0xffffff, 0);
   renderer.setSize(pageWidth, pageHeight);
   cloudsWrapper.value.appendChild(renderer.domElement);
@@ -202,7 +192,7 @@ function init() {
 function initSign() {
   const signTexture = new THREE.TextureLoader().load(sign);
   const sign3d = new THREE.Mesh(
-    new THREE.BoxGeometry(25, 25 * 1.250014),
+    new THREE.BoxGeometry(20, 20 * 1.75945017),
     new THREE.MeshBasicMaterial({
       map: signTexture,
       transparent: true,
@@ -222,7 +212,7 @@ function animate() {
     );
     camera.rotation.x = deltaX;
     clouds.rotation.x = deltaX;
-    skyMaterial.uniforms.iTime.value += 1; //update the time uniform in the shader
+    skyMaterial.uniforms.iTime.value += 0.5; //update the time uniform in the shader
   }
   camera.position.z = cameraPositionZ.value;
   renderer.render(scene, camera);
@@ -946,6 +936,8 @@ mainImage(gl_FragColor,(vUv.xy)*iResolution);
   const planeGeometry = new THREE.PlaneGeometry(200, 100);
   const plane = new THREE.Mesh(planeGeometry, skyMaterial); //create a plane to add the shader to
   plane.position.z = -20;
+  plane.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  //plane.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene.add(plane);
 }
 
@@ -983,6 +975,9 @@ onUnmounted(() => {
 canvas {
   width: 100%;
   height: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
 }
 
 .sign {
