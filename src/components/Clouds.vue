@@ -5,7 +5,6 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
-import { GUI } from "dat.gui";
 import * as THREE from "three";
 import Sky from "../assets/sky.js";
 import DynamicSky from "../assets/dynamicSky";
@@ -20,6 +19,9 @@ import noise from "../assets/rgba-noise.png";
 clouds credit: https://github.com/hezhongfeng/music163-demo
 Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
 */
+
+// TODO: FIX MOBILE
+// TODO: REFACTOR
 
 // number of clouds
 const CLOUD_COUNT = 10;
@@ -57,12 +59,20 @@ function init() {
   camera.position.z = MAX_Z;
   // rotate upward 45 degrees
   camera.rotation.x = -45 * THREE.Math.DEG2RAD;
-  // linear fog - the atomization effect increases linearly with distance
-  const fog = new THREE.Fog(BG_COLOR, 1, 1000);
-
   scene = new THREE.Scene();
 
-  // Clouds
+  // Renderer
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setClearColor(0xffffff, 0);
+  renderer.setSize(pageWidth, pageHeight);
+  cloudsWrapper.value.appendChild(renderer.domElement);
+}
+
+// Clouds
+
+function initClouds() {
+  // linear fog - the atomization effect increases linearly with distance
+  const fog = new THREE.Fog(BG_COLOR, 1, 1000);
   const cloudTexture = new THREE.TextureLoader().load(cloud);
   cloudTexture.magFilter = THREE.LinearMipMapLinearFilter;
   cloudTexture.minFilter = THREE.LinearMipMapLinearFilter;
@@ -159,32 +169,6 @@ function init() {
   clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
   clouds.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene.add(clouds);
-
-  // Light
-  const light = new THREE.DirectionalLight(0xffffff, 1.0);
-  light.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, -10);
-  light.target.position.set(Math.floor(RANDOM_POSITION_X / 2), 10, 0);
-  scene.add(light);
-  scene.add(light.target);
-
-  // Background
-
-  /**
-  GUI
-
-  const gui = new GUI();
-  const lightFolder = gui.addFolder("Light");
-  lightFolder.add(light.position, "x", 0);
-  lightFolder.add(light.position, "y", 0);
-  lightFolder.add(light.position, "z", 0);
-  lightFolder.open();
-  **/
-
-  // Renderer
-  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setClearColor(0xffffff, 0);
-  renderer.setSize(pageWidth, pageHeight);
-  cloudsWrapper.value.appendChild(renderer.domElement);
 }
 
 // Sign
@@ -284,63 +268,6 @@ function onMouseDown(e) {
     else action.reset();
     break;
   }
-}
-
-// Sky
-function initSky() {
-  // Add Sky
-  sky = new Sky();
-  sky.scale.setScalar(450000);
-  scene.add(sky);
-
-  sun = new THREE.Vector3();
-
-  /// GUI
-
-  const effectController = {
-    turbidity: 10,
-    rayleigh: 3,
-    mieCoefficient: 0.005,
-    mieDirectionalG: 0.7,
-    elevation: 2,
-    azimuth: 180,
-    exposure: renderer.toneMappingExposure,
-  };
-
-  function guiChanged() {
-    const uniforms = sky.material.uniforms;
-    uniforms["turbidity"].value = effectController.turbidity;
-    uniforms["rayleigh"].value = effectController.rayleigh;
-    uniforms["mieCoefficient"].value = effectController.mieCoefficient;
-    uniforms["mieDirectionalG"].value = effectController.mieDirectionalG;
-
-    const phi = THREE.MathUtils.degToRad(90 - effectController.elevation);
-    const theta = THREE.MathUtils.degToRad(effectController.azimuth);
-
-    sun.setFromSphericalCoords(1, phi, theta);
-
-    uniforms["sunPosition"].value.copy(sun);
-
-    renderer.toneMappingExposure = effectController.exposure;
-    renderer.render(scene, camera);
-  }
-
-  /*
-  const gui = new GUI();
-
-  gui.add(effectController, "turbidity", 0.0, 20.0, 0.1).onChange(guiChanged);
-  gui.add(effectController, "rayleigh", 0.0, 4, 0.001).onChange(guiChanged);
-  gui
-    .add(effectController, "mieCoefficient", 0.0, 0.1, 0.001)
-    .onChange(guiChanged);
-  gui
-    .add(effectController, "mieDirectionalG", 0.0, 1, 0.001)
-    .onChange(guiChanged);
-  gui.add(effectController, "elevation", 0, 90, 0.1).onChange(guiChanged);
-  gui.add(effectController, "azimuth", -180, 180, 0.1).onChange(guiChanged);
-  gui.add(effectController, "exposure", 0, 1, 0.0001).onChange(guiChanged);
-*/
-  guiChanged();
 }
 
 function initDynamicSky() {
@@ -824,6 +751,11 @@ vec2 GetDrops(vec2 uv, float seed, float m) {
 //END RAIN STUFF
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
+// removes reflection below horizon
+  if(vUv.y<.51){
+fragColor=vec4(0.118,0.282,0.467,1.); //Color for below horizon
+return;
+}
 
 	float AR = iResolution.x/iResolution.y;
     float M = 1.0; //canvas.innerWidth/M //canvas.innerHeight/M --res
@@ -943,7 +875,7 @@ mainImage(gl_FragColor,(vUv.xy)*iResolution);
 
 onMounted(() => {
   init();
-  //initSky();
+  initClouds();
   initDynamicSky();
   initSign();
   animate();
