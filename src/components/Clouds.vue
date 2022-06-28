@@ -234,7 +234,8 @@ function onWindowResize(e) {
 }
 
 function onMouseMove(e) {
-  mouseX = (e.clientX - window.innerWidth / 2) * 0.1;
+  mouseX = (e.clientX - window.innerWidth / 2) * 0.25;
+  console.log(mouseX);
   if (cameraPositionZ.value < 60) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
