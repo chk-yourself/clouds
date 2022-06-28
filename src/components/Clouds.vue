@@ -48,7 +48,7 @@ const pageHeight = window.innerHeight;
 const cloudsWrapper = ref(null);
 const deltaY = ref(0);
 const touchStartY = ref(0);
-let cameraPositionZ = ref(MAX_Z);
+let cameraPositionZ = ref(160);
 let cameraPositionY = ref(0);
 
 let camera, scene, renderer, bgScene, bgCamera, controls;
@@ -64,7 +64,7 @@ function init() {
   camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
   // initially at the furthest
   camera.position.z = 0;
-  camera.position.y = 0;
+  camera.position.y = cameraPositionY.value;
   // rotate upward 45 degrees
   //camera.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene = new THREE.Scene();
@@ -182,7 +182,7 @@ function initSign() {
 }
 
 function animate() {
-  cameraPositionZ.value = Math.max(300 - deltaY.value, 80);
+  cameraPositionZ.value = Math.max(160 - deltaY.value, 80);
   cameraPositionY.value = Math.min(220, deltaY.value);
   if (camera.position.y > 60) {
     skyMaterial.uniforms.iTime.value += 0.1; //update the time uniform in the shader
