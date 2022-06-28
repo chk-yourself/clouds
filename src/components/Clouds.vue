@@ -51,19 +51,17 @@ const touchStartY = ref(0);
 let cameraPositionZ = ref(160);
 let cameraPositionY = ref(0);
 
-let camera, scene, renderer, bgScene, bgCamera, controls;
+let camera, scene, renderer, controls;
 let clouds, skyMaterial;
 let action;
 const mouse = new THREE.Vector2();
+let mouseX = 0; // mouse coords for simulating cloud movement
 const raycaster = new THREE.Raycaster();
 
 function init() {
-  // Camera
   camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
   // the position of the camera, pan down left and right balance
   camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
-  // initially at the furthest
-  camera.position.z = 0;
   camera.position.y = cameraPositionY.value;
   // rotate upward 45 degrees
   //camera.rotation.x = -45 * THREE.Math.DEG2RAD;
@@ -182,15 +180,14 @@ function initSign() {
 }
 
 function animate() {
-  cameraPositionZ.value = Math.max(160 - deltaY.value, 80);
+  cameraPositionZ.value = Math.max(120 - deltaY.value, 80);
   cameraPositionY.value = Math.min(220, deltaY.value);
   if (camera.position.y > 60) {
     skyMaterial.uniforms.iTime.value += 0.1; //update the time uniform in the shader
   }
   camera.position.y = cameraPositionY.value;
   camera.position.z = cameraPositionZ.value;
-  //renderer.clear();
-  //renderer.render(bgScene, bgCamera);
+  clouds.position.x += (mouseX - camera.position.x) * 0.001;
   renderer.render(scene, camera);
   //controls.update();
   requestAnimationFrame(animate);
@@ -237,6 +234,7 @@ function onWindowResize(e) {
 }
 
 function onMouseMove(e) {
+  mouseX = (e.clientX - window.innerWidth / 2) * 0.1;
   if (cameraPositionZ.value < 60) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -266,8 +264,6 @@ function onMouseDown(e) {
 }
 
 function initDynamicSky() {
-  bgScene = new THREE.Scene();
-  bgCamera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
   const textureLoader = new THREE.TextureLoader();
 
   /*create a shader material with a standard vertexShader. Pass the */
@@ -865,12 +861,11 @@ mainImage(gl_FragColor,(vUv.xy)*iResolution);
     side: THREE.DoubleSide,
   });
   const planeGeometry = new THREE.PlaneGeometry(400, 200);
-  const plane = new THREE.Mesh(planeGeometry, skyMaterial); //create a plane to add the shader to
+  const plane = new THREE.Mesh(planeGeometry, skyMaterial);
   plane.position.z = -20;
   plane.position.x = Math.floor(RANDOM_POSITION_X / 2);
   plane.position.y = 230;
   scene.add(plane);
-  //bgScene.add(plane);
 }
 
 onMounted(() => {
