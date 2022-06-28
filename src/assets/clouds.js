@@ -16,10 +16,6 @@ import CloudShader from "../assets/CloudShader.js";
 import noise from "../assets/rgba-noise.png";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
-function randomIntFromInterval(min, max) {
-  return Math.floor(Math.random() * (max - min + 1) + min);
-}
-
 //
 /*
 clouds credit: https://github.com/hezhongfeng/music163-demo
@@ -30,7 +26,7 @@ Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
 // TODO: REFACTOR
 
 // number of clouds
-const CLOUD_COUNT = 40;
+const CLOUD_COUNT = 16;
 // length of z-axis occupied by each Cloud
 const PER_CLOUD_Z = 10;
 // total z-axis length of all clouds
@@ -49,9 +45,8 @@ const cloudsWrapper = ref(null);
 const deltaY = ref(0);
 const touchStartY = ref(0);
 let cameraPositionZ = ref(MAX_Z);
-let cameraPositionY = ref(0);
 
-let camera, scene, renderer, bgScene, bgCamera, controls;
+let camera, scene, renderer, bgScene, bgCamera;
 let clouds, skyMaterial;
 let action;
 const mouse = new THREE.Vector2();
@@ -63,10 +58,9 @@ function init() {
   // the position of the camera, pan down left and right balance
   camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
   // initially at the furthest
-  camera.position.z = 0;
-  camera.position.y = 0;
+  camera.position.z = MAX_Z;
   // rotate upward 45 degrees
-  //camera.rotation.x = -45 * THREE.Math.DEG2RAD;
+  camera.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene = new THREE.Scene();
 
   // Renderer
@@ -75,8 +69,6 @@ function init() {
   renderer.setClearColor(0xffffff, 0);
   renderer.setSize(pageWidth, pageHeight);
   cloudsWrapper.value.appendChild(renderer.domElement);
-
-  //controls = new OrbitControls(camera, renderer.domElement);
 }
 
 // Clouds
@@ -87,6 +79,7 @@ function initClouds() {
   const cloudTexture = new THREE.TextureLoader().load(cloud);
   cloudTexture.magFilter = THREE.LinearMipMapLinearFilter;
   cloudTexture.minFilter = THREE.LinearMipMapLinearFilter;
+  const cloudGeometry = new THREE.PlaneGeometry(64, 64);
   const cloudGeometries = [];
   const vShader = `
         varying vec2 vUv;
@@ -139,19 +132,36 @@ function initClouds() {
 
   for (let i = 0; i <= CLOUD_COUNT; i++) {
     let cloudRow = [];
-    for (let j = 0; j <= 100; j++) {
-      const cloudSize = randomIntFromInterval(64, 88);
-      const cloudGeometry = new THREE.PlaneGeometry(cloudSize, cloudSize); // generates clouds with varying dimensions
-      // After the X axis is offset, adjust the camera position to achieve balance
-      // The Y axis wants to put the clouds in the lower position of the scene, so they are all negative values
-      // Z-axis displacement is: the current number of clouds * the Z-axis length occupied by each cloud
-      cloudGeometry.translate(
-        Math.random() * 1000 - 500,
-        Math.random() * 200 - 15, //i * Math.random() * 200 - 15,
-        i * Math.random() * PER_CLOUD_Z
-      );
-
-      cloudRow.push(cloudGeometry);
+    for (let j = 0; j <= 12; j++) {
+      let instanceGeometry;
+      if (i === CLOUD_COUNT) {
+        instanceGeometry = new THREE.PlaneGeometry(32, 32);
+        if (j % 2 === 0) {
+          instanceGeometry.translate(
+            Math.floor(RANDOM_POSITION_X / 2),
+            -20,
+            -5
+          );
+        } else {
+          instanceGeometry = new THREE.PlaneGeometry(48, 48);
+          instanceGeometry.translate(
+            Math.random() * RANDOM_POSITION_X,
+            (1 + Math.random()) * -16,
+            -5
+          );
+        }
+      } else {
+        instanceGeometry = cloudGeometry.clone();
+        // After the X axis is offset, adjust the camera position to achieve balance
+        // The Y axis wants to put the clouds in the lower position of the scene, so they are all negative values
+        // Z-axis displacement is: the current number of clouds * the Z-axis length occupied by each cloud
+        instanceGeometry.translate(
+          Math.random() * RANDOM_POSITION_X,
+          i * -Math.random() * RANDOM_POSITION_Y,
+          i * Math.random() * PER_CLOUD_Z
+        );
+      }
+      cloudRow.push(instanceGeometry);
     }
     cloudGeometries.push(...cloudRow);
   }
@@ -160,7 +170,7 @@ function initClouds() {
     BufferGeometryUtils.mergeBufferGeometries(cloudGeometries);
 
   clouds = new THREE.Mesh(mergedCloudGeometry, cloudMaterial);
-  //clouds.rotation.x = -45 * THREE.Math.DEG2RAD;
+  clouds.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene.add(clouds);
 }
 
@@ -169,30 +179,33 @@ function initClouds() {
 function initSign() {
   const signTexture = new THREE.TextureLoader().load(sign);
   const sign3d = new THREE.Mesh(
-    new THREE.BoxGeometry(60, 60 * 1.75945017),
+    new THREE.BoxGeometry(20, 20 * 1.75945017),
     new THREE.MeshBasicMaterial({
       map: signTexture,
       transparent: true,
     })
   );
   sign3d.position.z = -20;
-  sign3d.position.y = 230;
+  sign3d.position.y = 0;
   sign3d.position.x = Math.floor(RANDOM_POSITION_X / 2);
   scene.add(sign3d);
 }
 
 function animate() {
-  cameraPositionZ.value = Math.max(300 - deltaY.value, 80);
-  cameraPositionY.value = Math.min(220, deltaY.value);
-  if (camera.position.y > 60) {
+  cameraPositionZ.value = Math.max(MAX_Z - deltaY.value, 10);
+  if (cameraPositionZ.value <= 60) {
+    const deltaX = Math.min(
+      0,
+      (-cameraPositionZ.value + 15) * THREE.Math.DEG2RAD
+    );
+    camera.rotation.x = deltaX;
+    clouds.rotation.x = deltaX;
     skyMaterial.uniforms.iTime.value += 0.1; //update the time uniform in the shader
   }
-  camera.position.y = cameraPositionY.value;
   camera.position.z = cameraPositionZ.value;
-  //renderer.clear();
-  //renderer.render(bgScene, bgCamera);
+  renderer.clear();
+  renderer.render(bgScene, bgCamera);
   renderer.render(scene, camera);
-  //controls.update();
   requestAnimationFrame(animate);
 }
 
@@ -237,7 +250,7 @@ function onWindowResize(e) {
 }
 
 function onMouseMove(e) {
-  if (cameraPositionZ.value < 60) return;
+  if (cameraPositionZ.value > 10) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   skyMaterial.uniforms.iMouse.value.set(
@@ -749,12 +762,10 @@ vec2 GetDrops(vec2 uv, float seed, float m) {
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
 // removes reflection below horizon
-/*
   if(vUv.y<.51){
 fragColor=vec4(0.118,0.282,0.467,1.); //Color for below horizon
 return;
 }
-*/
 
 	float AR = iResolution.x/iResolution.y;
     float M = 1.0; //canvas.innerWidth/M //canvas.innerHeight/M --res
@@ -864,13 +875,11 @@ mainImage(gl_FragColor,(vUv.xy)*iResolution);
     wireframe: false,
     side: THREE.DoubleSide,
   });
-  const planeGeometry = new THREE.PlaneGeometry(400, 200);
+  const planeGeometry = new THREE.PlaneGeometry(200, 100);
   const plane = new THREE.Mesh(planeGeometry, skyMaterial); //create a plane to add the shader to
-  plane.position.z = -20;
-  plane.position.x = Math.floor(RANDOM_POSITION_X / 2);
-  plane.position.y = 230;
-  scene.add(plane);
-  //bgScene.add(plane);
+  plane.position.z = -60;
+  plane.position.y = 0;
+  bgScene.add(plane);
 }
 
 onMounted(() => {
