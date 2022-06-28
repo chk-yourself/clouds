@@ -28,6 +28,7 @@ Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
 
 // TODO: FIX MOBILE
 // TODO: REFACTOR
+// TODO: vanilla js??
 
 // number of clouds
 const CLOUD_COUNT = 40;
@@ -35,9 +36,6 @@ const CLOUD_COUNT = 40;
 const PER_CLOUD_Z = 10;
 // total z-axis length of all clouds
 const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
-// random parameters for x-axies and y-axis translation
-const RANDOM_POSITION_X = 80;
-const RANDOM_POSITION_Y = 120;
 // background color - sky blue
 const BG_COLOR = "#1e4877";
 
@@ -50,6 +48,7 @@ const deltaY = ref(0);
 const touchStartY = ref(0);
 let cameraPositionZ = ref(160);
 let cameraPositionY = ref(0);
+let cameraPositionX = ref(0);
 
 let camera, scene, renderer, controls;
 let clouds, skyMaterial;
@@ -60,10 +59,8 @@ const raycaster = new THREE.Raycaster();
 
 function init() {
   camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
-  // the position of the camera, pan down left and right balance
-  camera.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  camera.position.x = 0;
   camera.position.y = cameraPositionY.value;
-  // rotate upward 45 degrees
   //camera.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene = new THREE.Scene();
 
@@ -140,9 +137,6 @@ function initClouds() {
     for (let j = 0; j <= 100; j++) {
       const cloudSize = randomIntFromInterval(64, 88);
       const cloudGeometry = new THREE.PlaneGeometry(cloudSize, cloudSize); // generates clouds with varying dimensions
-      // After the X axis is offset, adjust the camera position to achieve balance
-      // The Y axis wants to put the clouds in the lower position of the scene, so they are all negative values
-      // Z-axis displacement is: the current number of clouds * the Z-axis length occupied by each cloud
       cloudGeometry.translate(
         Math.random() * 1000 - 500,
         Math.random() * 200 - 15, //i * Math.random() * 200 - 15,
@@ -175,19 +169,31 @@ function initSign() {
   );
   sign3d.position.z = -20;
   sign3d.position.y = 230;
-  sign3d.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  sign3d.position.x = 0;
   scene.add(sign3d);
 }
 
 function animate() {
   cameraPositionZ.value = Math.max(120 - deltaY.value, 80);
   cameraPositionY.value = Math.min(220, deltaY.value);
+  // move camera based on mouse position
+  /*
+  cameraPositionX.value = Math.min(
+    5,
+    Math.max(-5, camera.position.x + (mouseX - camera.position.x) * 0.001)
+  );
+  */
   if (camera.position.y > 60) {
     skyMaterial.uniforms.iTime.value += 0.1; //update the time uniform in the shader
   }
   camera.position.y = cameraPositionY.value;
   camera.position.z = cameraPositionZ.value;
-  clouds.position.x += (mouseX - camera.position.x) * 0.001;
+  camera.position.x = cameraPositionX.value;
+  // move clouds based on mouse position
+  clouds.position.x = Math.min(
+    30,
+    Math.max(-30, clouds.position.x + (mouseX - clouds.position.x) * 0.005)
+  );
   renderer.render(scene, camera);
   //controls.update();
   requestAnimationFrame(animate);
@@ -235,7 +241,6 @@ function onWindowResize(e) {
 
 function onMouseMove(e) {
   mouseX = (e.clientX - window.innerWidth / 2) * 0.25;
-  console.log(mouseX);
   if (cameraPositionZ.value < 60) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -864,7 +869,7 @@ mainImage(gl_FragColor,(vUv.xy)*iResolution);
   const planeGeometry = new THREE.PlaneGeometry(400, 200);
   const plane = new THREE.Mesh(planeGeometry, skyMaterial);
   plane.position.z = -20;
-  plane.position.x = Math.floor(RANDOM_POSITION_X / 2);
+  plane.position.x = 0;
   plane.position.y = 230;
   scene.add(plane);
 }
