@@ -31,8 +31,8 @@ const PER_CLOUD_Z = 10; // length of z-axis occupied by each cloud
 const BG_COLOR = "#1e4877"; // blue
 const { innerWidth: viewportWidth, innerHeight: viewportHeight } = window;
 const cloudsWrapper = ref(null);
-let deltaY = 0;
-const touchStartY = ref(0);
+let deltaY = 0,
+  touchStartY = 0;
 let camera, scene, renderer, controls;
 let clouds, skyMaterial;
 let action;
@@ -191,13 +191,13 @@ function onWheel(e) {
 
 function onTouchStart(e) {
   const touch = e.targetTouches ? e.targetTouches[0] : e;
-  touchStartY.value = touch.pageY;
+  touchStartY = touch.pageY;
 }
 
 function onTouchMove(e) {
   const touch = e.targetTouches ? e.targetTouches[0] : e;
-  deltaY = touch.pageY + touchStartY.value;
-  touchStartY.value = touch.pageY;
+  deltaY = (touch.pageY + touchStartY) * 0.007;
+  touchStartY = deltaY;
 }
 
 function onWindowResize(e) {
@@ -298,7 +298,7 @@ function initDynamicSky() {
     
 #define ORIG_CLOUD 0
 #define ENABLE_RAIN 0 //enable rain drops on screen
-#define SIMPLE_SUN 0
+#define SIMPLE_SUN 1
 #define NICE_HACK_SUN 1
 #define SOFT_SUN 1
 #define cloudy  0.5 //0.0 clear sky
@@ -617,7 +617,7 @@ vec3 stars(in vec3 p)
 
 //SIMPLE SUN STUFF
 const float PI = 3.14159265358979323846;
-const float density = 0.5;
+const float density = 0.5;  // SEEMS TO AFFECT SUN SIZE-ish?   try a value like 10 for smaller sun
 const float zenithOffset = 0.48;
 const vec3 skyColor = vec3(0.37, 0.55, 1.0) * (1.0 + 0.0);
 
@@ -648,6 +648,7 @@ vec3 jodieReinhardTonemap(vec3 c){
 vec3 getAtmosphericScattering(vec2 p, vec2 lp){
     float zenithnew = zenithDensity(p.y);
     float sunPointDistMult =  clamp(length(max(lp.y + 0.1 - zenithOffset, 0.0)), 0.0, 1.0);
+    
     vec3 absorption = getSkyAbsorption(skyColor, zenithnew);
     vec3 sunAbsorption = getSkyAbsorption(skyColor, zenithDensity(lp.y + 0.1));
     vec3 sun3 = getSunPoint(p, lp) * absorption;
@@ -732,13 +733,6 @@ vec2 GetDrops(vec2 uv, float seed, float m) {
 //END RAIN STUFF
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord ) {
-// removes reflection below horizon
-/*
-  if(vUv.y<.51){
-fragColor=vec4(0.118,0.282,0.467,1.); //Color for below horizon
-return;
-}
-*/
 
 	float AR = iResolution.x/iResolution.y;
     float M = 1.0; //canvas.innerWidth/M //canvas.innerHeight/M --res
@@ -841,7 +835,16 @@ return;
 
 void main() {
 vec4 fragCoord = gl_FragCoord;
-mainImage(gl_FragColor,vec2(vUv.x*.5,((vUv.y*.5)+.5))*iResolution);
+
+vec2 uv = vUv;
+uv.x *= .5;
+uv.x += .25;
+uv.y+=.5;
+
+mainImage(gl_FragColor,uv*iResolution);
+
+//mainImage(gl_FragColor,vUv*iResolution);
+
 	//gl_FragColor = vec4(pow(gl_FragColor.rgb, vec3(1.0/2.2)), 1.); //gamma correct
 }
   `,
