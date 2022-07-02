@@ -1,5 +1,4 @@
 <template>
-  <h1 class="wheel-delta">{{ cameraPositionZ }}</h1>
   <div class="clouds-wrapper" ref="cloudsWrapper"></div>
 </template>
 
@@ -7,12 +6,9 @@
 import { ref, onMounted, onUnmounted } from "vue";
 import * as THREE from "three";
 import gsap from "gsap";
-import Sky from "../assets/sky.js";
-import DynamicSky from "../assets/dynamicSky";
 import * as BufferGeometryUtils from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import cloud from "../assets/cloud.png";
 import sign from "../assets/sign.png";
-import CloudShader from "../assets/CloudShader.js";
 import noise from "../assets/rgba-noise.png";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls";
 
@@ -30,26 +26,13 @@ Shader adapted from the code here https://www.shadertoy.com/view/tdSXzD
 // TODO: REFACTOR
 // TODO: vanilla js??
 
-// number of clouds
 const CLOUD_COUNT = 40;
-// length of z-axis occupied by each Cloud
-const PER_CLOUD_Z = 10;
-// total z-axis length of all clouds
-const MAX_Z = CLOUD_COUNT * PER_CLOUD_Z;
-// background color - sky blue
-const BG_COLOR = "#1e4877";
-
-const pageWidth = window.innerWidth;
-const pageHeight = window.innerHeight;
-
-// State
+const PER_CLOUD_Z = 10; // length of z-axis occupied by each cloud
+const BG_COLOR = "#1e4877"; // blue
+const { innerWidth: viewportWidth, innerHeight: viewportHeight } = window;
 const cloudsWrapper = ref(null);
-const deltaY = ref(0);
+let deltaY = 0;
 const touchStartY = ref(0);
-let cameraPositionZ = ref(160);
-let cameraPositionY = ref(0);
-let cameraPositionX = ref(0);
-
 let camera, scene, renderer, controls;
 let clouds, skyMaterial;
 let action;
@@ -58,9 +41,12 @@ let mouseX = 0; // mouse coords for simulating cloud movement
 const raycaster = new THREE.Raycaster();
 
 function init() {
-  camera = new THREE.PerspectiveCamera(70, pageWidth / pageHeight, 1, 1000);
-  camera.position.x = 0;
-  camera.position.y = cameraPositionY.value;
+  camera = new THREE.PerspectiveCamera(
+    70,
+    viewportWidth / viewportHeight,
+    1,
+    1000
+  );
   //camera.rotation.x = -45 * THREE.Math.DEG2RAD;
   scene = new THREE.Scene();
 
@@ -68,7 +54,7 @@ function init() {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.autoClear = false;
   renderer.setClearColor(0xffffff, 0);
-  renderer.setSize(pageWidth, pageHeight);
+  renderer.setSize(viewportWidth, viewportHeight);
   cloudsWrapper.value.appendChild(renderer.domElement);
 
   //controls = new OrbitControls(camera, renderer.domElement);
@@ -174,11 +160,11 @@ function initSign() {
 }
 
 function animate() {
-  cameraPositionZ.value = Math.max(120 - deltaY.value, 80);
-  cameraPositionY.value = Math.min(220, deltaY.value);
+  camera.position.z = Math.max(120 - deltaY, 80);
+  camera.position.y = Math.min(220, deltaY);
   // move camera based on mouse position
   /*
-  cameraPositionX.value = Math.min(
+  camera.position.x = Math.min(
     5,
     Math.max(-5, camera.position.x + (mouseX - camera.position.x) * 0.001)
   );
@@ -186,13 +172,11 @@ function animate() {
   if (camera.position.y > 60) {
     skyMaterial.uniforms.iTime.value += 0.1; //update the time uniform in the shader
   }
-  camera.position.y = cameraPositionY.value;
-  camera.position.z = cameraPositionZ.value;
-  camera.position.x = cameraPositionX.value;
+
   // move clouds based on mouse position
   clouds.position.x = Math.min(
     30,
-    Math.max(-30, clouds.position.x + (mouseX - clouds.position.x) * 0.005)
+    Math.max(-30, clouds.position.x + (mouseX - clouds.position.x) * 0.002)
   );
   renderer.render(scene, camera);
   //controls.update();
@@ -202,10 +186,7 @@ function animate() {
 // Event Listeners
 
 function onWheel(e) {
-  deltaY.value = Math.max(
-    0,
-    deltaY.value + (e.wheelDeltaY || e.deltaY) * -0.007
-  );
+  deltaY = Math.max(0, deltaY + (e.wheelDeltaY || e.deltaY) * -0.007);
 }
 
 function onTouchStart(e) {
@@ -215,7 +196,7 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   const touch = e.targetTouches ? e.targetTouches[0] : e;
-  deltaY.value = touch.pageY + touchStartY.value;
+  deltaY = touch.pageY + touchStartY.value;
   touchStartY.value = touch.pageY;
 }
 
@@ -241,7 +222,8 @@ function onWindowResize(e) {
 
 function onMouseMove(e) {
   mouseX = (e.clientX - window.innerWidth / 2) * 0.25;
-  if (cameraPositionZ.value < 60) return;
+  console.log({ mouseX });
+  if (camera.position.z < 60) return;
   mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
   skyMaterial.uniforms.iMouse.value.set(
@@ -251,7 +233,7 @@ function onMouseMove(e) {
 }
 
 function onMouseDown(e) {
-  if (cameraPositionZ.value > 10) return;
+  if (camera.position.z > 10) return;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObjects(scene.children);
   for (let i = 0; i < intersects.length; i++) {
@@ -859,18 +841,18 @@ return;
 
 void main() {
 vec4 fragCoord = gl_FragCoord;
-mainImage(gl_FragColor,(vUv.xy)*iResolution);
+mainImage(gl_FragColor,vec2(vUv.x*.5,((vUv.y*.5)+.5))*iResolution);
 	//gl_FragColor = vec4(pow(gl_FragColor.rgb, vec3(1.0/2.2)), 1.); //gamma correct
 }
   `,
     wireframe: false,
     side: THREE.DoubleSide,
   });
-  const planeGeometry = new THREE.PlaneGeometry(400, 200);
+  const planeGeometry = new THREE.PlaneGeometry(300, 150); // 600, 300 or 400, 200
   const plane = new THREE.Mesh(planeGeometry, skyMaterial);
   plane.position.z = -20;
   plane.position.x = 0;
-  plane.position.y = 230;
+  plane.position.y = 230; //140 or 230;
   scene.add(plane);
 }
 
@@ -921,12 +903,5 @@ canvas {
   left: 0;
   z-index: -1;
   display: none;
-}
-
-.wheel-delta {
-  position: fixed;
-  top: 50px;
-  height: 100vh;
-  width: 100vw;
 }
 </style>
