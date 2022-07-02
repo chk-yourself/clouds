@@ -196,7 +196,10 @@ function onTouchStart(e) {
 
 function onTouchMove(e) {
   const touch = e.targetTouches ? e.targetTouches[0] : e;
-  deltaY = (touch.pageY + touchStartY) * 0.007;
+  deltaY =
+    touch.pageY > touchStartY
+      ? (touch.pageY + touchStartY) * 0.007
+      : (touchStartY - touch.pageY) * 0.007;
   touchStartY = deltaY;
 }
 
